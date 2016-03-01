@@ -1,0 +1,24 @@
+---
+- name: create an ec2 instance
+  hosts: localhost
+
+  connection: local
+  gather_facts: no
+
+  vars:
+# these vars should be passed in or auto-set
+   - account: nonprod
+   - app_name: galahad
+   - env: nes
+   - region: us-west-2
+# these vars are discoverable. don't hard code this
+   - instance_size: t2.nano
+   - ubuntu_ami: ami-f500c996
+   - subnet_lookup:
+       private-a: "subnet-b2c697c5"
+       private-b: "subnet-d07750b5"
+       public-a:  "subnet-dac697ad"
+       public-b:  "subnet-f877509d"
+
+  roles:
+   - bastion-instance

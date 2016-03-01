@@ -1,0 +1,57 @@
+---
+- name: create bastion security group
+  ec2_group:
+    name: "{{app_name}}-{{env}}-bastion"
+    description: security group for bastion host
+    region: "{{region}}"
+    vpc_id: "{{vpc_lookup['id']}}"
+    purge_rules: True
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+    profile: "{{account}}"
+    purge_rules_egress: True
+    rules_egress:
+      - proto: all
+        type: all
+        cidr_ip: 0.0.0.0/0
+  when: vpc_lookup['id'] is defined
+
+- name: verify if bastion server exists
+  shell: >
+    aws --profile {{account}} --region {{region}}
+    ec2 describe-instances
+    --filters
+    "Name=tag:Service,Values={{app_name}}"
+    "Name=tag:Environment,Values={{env}}"
+    "Name=tag:Role,Values=bastion"
+    --query "Reservations[*].Instances[*].State.Name"
+    --output=text
+  changed_when: false
+  register: shell_bastion_lookup
+
+- set_fact: bastion_name="{{app_name}}-{{env}}-bastion"
+
+- name: provision bastion instance... please wait
+  ec2:
+    assign_public_ip: True
+    group: "{{app_name}}-{{env}}-bastion"
+    key_name: "{{app_name}}-{{account}}"
+    image: "{{ubuntu_ami}}"
+    instance_tags:
+      Name: "{{bastion_name}}"
+      Environment: "{{env}}"
+      Role: bastion
+      Service: "{{app_name}}"
+    instance_type: "{{instance_size}}"
+    profile: "{{account}}"
+    region: "{{region}}"
+    user_data: "{{lookup('template', '../templates/user-data.j2')}}"
+    vpc_subnet_id: "{{subnet_lookup['public-a']}}"
+    wait: True
+  register: bastion
+  when:
+   - shell_bastion_lookup.stdout is defined
+   - "not 'running' in shell_bastion_lookup.stdout"
